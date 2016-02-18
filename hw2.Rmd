@@ -1,0 +1,381 @@
+---
+title: "Homework 2 - Whiskey Analytics"
+author: "Kaushik Nuvvula"
+date: "October 5, 2015"
+output: html_document
+self_contained: yes
+---
+
+In Chapter 6 of the book "Data Science for Business" by Provost and Fawcett, there is a reference (page 144) to  NYU colleague Foster Provost's desire to find Whiskeys that are similar to Bunnahabhain. We will use a data science approach to help Professor Provost. The relevant data for this is posted on Moodle and was originally curated by François-Joseph Lapointe and Pierre Legendre (1994) of the University of Montréal.
+
+1. Your first task is to 'hand-compute' (this means that you dont use a built in function that R has but write the mathematical expresssion to compute the metric) the Jacquard distance to recreate the distance table on Page 146 (also shown below in the HTML version of this document). Use only the Color, Nose, Body, Palate and Finish attributes for this question and the next twi questions. Note, that you can use the union (A <- df1[] | df2[]) and intersection operators (B <- df1[] & df2[]) of two vectors to do this quite easily. 
+```{r, echo=FALSE}
+
+data <- read.csv("HW2_scotch.csv",header = TRUE, skip =1, nrows=109)
+
+```
+
+
+```{r}
+local({r <- getOption("repos"); 
+       r["CRAN"] <- "http://cran.r-project.org"; options(repos=r)})
+
+install.packages("StatMatch")
+library(StatMatch)
+install.packages("stats")
+library(stats)
+install.packages("dendextend")
+library(dendextend)
+install.packages("cluster")
+library(cluster)
+install.packages("fpc")
+library(fpc)
+
+#Removing the duplicate whiskey name column
+data$X= NULL 
+#Duplicating data
+data_dup = data
+
+#Subsetting only the Color, Nose, Body, Palate and finish attributes
+data = data[,1:69]
+ 
+#transposing data and assigning column names
+data1= t(data)
+colnames(data1) = data1[1, ]
+
+data1 <- as.data.frame(data1[-1,])
+
+#Ordering Columns: In order to make Bunnahabhain as 1st column
+
+names(data1)[names(data1) == 'Bunnahabhain'] <- 'AABunnahabhain'
+
+data1<-data1[,order(colnames(data1),decreasing=FALSE)]
+
+names(data1)[names(data1) == 'AABunnahabhain'] <- 'Bunnahabhain'
+
+k=data1
+
+dataframe <- as.data.frame(k, stringsAsFactors=F)
+
+# Subsetting for Bunnahabhain = 1 and Bunnahabhain = 0
+df_1 <- subset(dataframe, Bunnahabhain == 1)
+
+df_0 <- subset(dataframe, Bunnahabhain == 0)
+
+# Similarity matrix for Bunnahabhain = 1
+similarity.matrix_1<-apply(df_1,2,function(x)colSums(x==df_1))
+diag(similarity.matrix_1)<-0
+
+# p = Number of (1,1) macthes 
+final_p = similarity.matrix_1[,0:1]
+
+## q = Number of (1,0) macthes 
+similarity.matrix_1_q = nrow(df_1) - similarity.matrix_1
+diag(similarity.matrix_1_q)<-0 
+
+final_q = similarity.matrix_1_q[,0:1]
+
+# Similarity matrix for Bunnahabhain = 0
+similarity.matrix_0<-apply(df_0,2,function(x)colSums(x==df_0))
+
+similarity.matrix_0 = nrow(df_0) - similarity.matrix_0
+
+#diag(similarity.matrix_0)<-0
+
+# r = Number of (0,1) macthes 
+final_r = similarity.matrix_0[,0:1]
+
+# Sum of (1,0) and (0,1) 
+final_q_r = final_q+ final_r
+
+# Sum of (1,0) , (0,1)  , (1,1)
+final_p_q_r =  final_p + final_q + final_r 
+
+#Calculating Jaccard Distance
+Jaccard_Distance = final_q_r/final_p_q_r
+Jaccard_Distance = sort(Jaccard_Distance, decreasing = FALSE)
+Jaccard_Distance = data.matrix(Jaccard_Distance)
+colnames(Jaccard_Distance)[1] <- c( "Distance")
+Jaccard_Distance = round(Jaccard_Distance, digits = 3)
+Jaccard_Distance
+
+# Top 5 whiskeys similar to Bunnahabhain are as follows (Using Jaccard Distance)
+#Glenglassaugh         0.643
+#Tullibardine          0.647
+#Ardberg               0.667
+#Bruichladdich         0.667
+#Glenmorangie          0.667
+
+
+```
+
+2. Repeat question 1, using another suitable distance function for the kind of data in this dataset
+
+```{r}
+
+#2 Using Dice (Sorenson's) Coefficient
+Dice_Sorenson_Coefficient =  2*final_p/(2*final_p + final_q_r)
+Dice_Sorenson_Distance = 1 - Dice_Sorenson_Coefficient
+Dice_Sorenson_Distance = sort(Dice_Sorenson_Distance, decreasing = FALSE)
+Dice_Sorenson_Distance = data.matrix(Dice_Sorenson_Distance)
+colnames(Dice_Sorenson_Distance)[1] <- c( "Distance")
+Dice_Sorenson_Distance = round(Dice_Sorenson_Distance, digits =3)
+Dice_Sorenson_Distance
+
+# Top  5 whiskeys similar to Bunnahabhain are as follows (Using Sorensen Distance)
+#Glenglassaugh         0.474
+#Tullibardine          0.478
+#Ardberg               0.500
+#Bruichladdich         0.500
+#Glenmorangie          0.500
+
+#Note 1 : Using either Jaccard or Sorensen Distance the top 5 whiskeys similar to Bunnahabhain are still the same
+
+
+
+```
+
+3. Repeat questions 1 and 2 for Prof. Bapna's favorite whiskey, the Dalwhinie recommending three simialr Whiskey's to him!
+
+```{r}
+
+#Ordering Columns so that Dalwhinne is the 1st column
+names(data1)[names(data1) == 'Dalwhinnie'] <- 'AABDalwhinnie'
+
+data1<-data1[,order(colnames(data1),decreasing=FALSE)]
+
+names(data1)[names(data1) == 'AABDalwhinnie'] <- 'Dalwhinnie'
+
+k=data1
+
+dataframe <- as.data.frame(k, stringsAsFactors=F)
+
+# Subsetting 
+df_1 <- subset(dataframe, Dalwhinnie == 1)
+
+df_0 <- subset(dataframe, Dalwhinnie == 0)
+
+# Calculating Similarity matrices
+similarity.matrix_1<-apply(df_1,2,function(x)colSums(x==df_1))
+diag(similarity.matrix_1)<-0
+
+# p = Number of (1,1) macthes 
+final_p = similarity.matrix_1[,0:1]
+
+## q = Number of (1,0) macthes 
+similarity.matrix_1_q = nrow(df_1) - similarity.matrix_1
+diag(similarity.matrix_1_q)<-0 
+
+final_q = similarity.matrix_1_q[,0:1]
+
+similarity.matrix_0<-apply(df_0,2,function(x)colSums(x==df_0))
+
+similarity.matrix_0 = nrow(df_0) - similarity.matrix_0
+
+#diag(similarity.matrix_0)<-0
+
+# ## r = Number of (0,1) macthes 
+final_r = similarity.matrix_0[,0:1]
+
+final_q_r = final_q+ final_r
+final_p_q_r =  final_p + final_q + final_r 
+
+Jaccard_Distance = final_q_r/final_p_q_r
+Jaccard_Distance = sort(Jaccard_Distance, decreasing = FALSE)
+Jaccard_Distance = data.matrix(Jaccard_Distance)
+colnames(Jaccard_Distance)[1] <- c( "Distance")
+Jaccard_Distance = round(Jaccard_Distance, digits = 3)
+Jaccard_Distance
+
+# Top 5 whiskeys similar to Dalwhinnie are as follows (Using Jaccard). Prof.Bapna should probably try these first
+
+#Benromach             0.619
+#Glenury Royal         0.667
+#Glen Spey             0.684
+#Glenkinchie           0.696
+#Coleburn              0.700
+
+#Repeating the same using Sorensen Dice Coefficeint
+Dice_Sorenson_Coefficient =  2*final_p/(2*final_p + final_q_r)
+Dice_Sorenson_Distance = 1 - Dice_Sorenson_Coefficient
+Dice_Sorenson_Distance = sort(Dice_Sorenson_Distance, decreasing = FALSE)
+Dice_Sorenson_Distance = data.matrix(Dice_Sorenson_Distance)
+colnames(Dice_Sorenson_Distance)[1] <- c( "Distance")
+Dice_Sorenson_Distance = round(Dice_Sorenson_Distance, digits =3)
+Dice_Sorenson_Distance
+
+# Top 5 whiskeys similar to Dalwhinnie are as follows (Using Dice Sorensen). Prof.Bapna should probably try these first
+#Benromach             0.448
+#Glenury Royal         0.500
+#Glen Spey             0.520
+#Glenkinchie           0.533
+#Coleburn              0.538
+
+# The five similar whisleys using both Jaccard and Dice Soreson are as follows. Prof.Bapna will probabaly like them.
+# 1) Benromach             
+# 2) Glenury Royal         
+# 3) Glen Spey   
+# 4) Glenkinchie
+# 5) Coleburn
+
+```
+
+4. Repeat question 3 above using the other available attributes, to the extent possible, in the data. You can use any function provided by R for this. 
+
+```{r}
+#4 Handling mixed data - Gower's distance can do this task of handling data of different attributes
+#Gowers Distance
+data = data_dup
+
+#Removing the score columns and age as there are many negative ages, this might bias our results
+data <- data[ -c(70:72) ]
+
+#install.packages("StatMatch")
+#library(StatMatch)
+
+gower= gower.dist(data)
+
+colnames(gower) <- paste(data$NAME, sep = "")
+
+x = gower[,"Dalwhinnie"] 
+x= round(x,digits =3)
+y = colnames(gower)
+
+final_gower = data.frame(y,x)
+
+colnames(final_gower)[1:2] <- c("Whiskey", "Gowers_Distance")
+
+final_gower =final_gower[ order(-final_gower[,2],decreasing = TRUE), ]
+final_gower
+
+# Using Gowers diatance, these are top 5 whiseys that might be similar to Prof.Bapna's taste
+
+#           Benromach           0.175
+#           Glen Spey           0.175
+#            Coleburn           0.187
+#       Craigellachie           0.187
+#               Banff           0.200
+
+
+```
+
+5. Try both hierarchical and k-means clustering, and then choose one of two methods to find some meaningful clusters of whiskeys that can help business decisions makers gain inights from the Whiskey dataset. Present your analysis in a form that is digestable by business decision makers.  
+```{r}
+
+#5 Hierarchical Clustering 
+# Using columns with whiskey attributes
+data = data_dup[,1:69]
+
+#library(stats)
+rownames(data)<- data[,1]
+data<- data[c(-1)]
+
+data_dup1 = data
+
+distance <- dist(data, method = "binary")
+#hcluster <- hclust(distance, method = "ward.D") #using wards method to calculate cluster
+#plot(hcluster, hang = 0, label = F, main = "Cluster Dendrogram") 
+
+fit.average <- hclust(distance, method="ward.D") 
+#plot(fit.average, hang=1, cex=.8, main="Cluster Dendogram")
+#dendogram = rect.hclust(fit.average, k=5)
+
+#install.packages("dendextend")
+# Using Hierarchical Clustering we can see that there are 5 clusters if we look at the dendogram
+#library(dendextend)
+dendogram = color_labels(fit.average, k = 5)
+plot(dendogram)
+
+## Elbow Curve # Not much can be interpreted as the curve does not converge, Does not even converge when # of clusters is 30
+wss <- (nrow(data_dup1)-1)*sum(apply(data_dup1,2,var))
+for (i in 2:20) wss[i] <- sum(kmeans(data_dup1, 
+                                     centers=i)$withinss)
+plot(1:20, wss, type="b", xlab="Number of Clusters",
+     ylab="Within groups sum of squares")
+
+#Silhoutte coeff to determine the optimal number of clusters.
+# Not very effective says that there are only 2 clusters
+#library(cluster)
+pamk.best <- pamk(data_dup1)
+cat("number of clusters estimated by optimum average silhouette width:", pamk.best$nc, "\n")
+plot(pam(data_dup1, pamk.best$nc))
+
+
+#k-means cluster # 5 cluster solution which is inferred from hierarchical clustering
+kcluster <- kmeans(data_dup1, 5) # mentioning 5 as we saw 5 clusters in hierarchial clustering
+kcluster$size # Number of data points in ecah cluster
+kcluster$centers #gives the corodinates of centrioid
+kcluster$cluster # Shows the cluster to which each data point belongs
+
+#library(fpc)
+plotcluster(x = data_dup1,kcluster$cluster)
+
+# However the clusters are not clearly defined. Check the image. Now let us try with 3.
+
+#k-means cluster # 3 cluster solution # Clusters are clearly defined. refer to the image
+#Also k-means uses euclidean distance in assigning clusters. As our data is in binary format, k-means will not be an effective way to cluster data
+kcluster <- kmeans(data_dup1, 3) # mentioning 3 as we saw from the image
+kcluster$size # Number of data points in ecah cluster
+kcluster$centers #gives the corodinates of centrioid
+kcluster$cluster # Shows the cluster to which each data point belongs
+
+#library(fpc)
+plotcluster(x = data_dup1,kcluster$cluster)
+
+#k-medoids approach  # Not very effective # Check the plot does not capture enough variance
+
+set.seed(1234)
+fit.pam <- pam(data_dup1, k=5, stand=TRUE)
+fit.pam$medoids
+clusplot(fit.pam, main="Cluster Plot")
+
+# So, we tried different types of clustering
+#1) Hierarchical
+#2) k -means
+#3) PAM - Partioning around medoids
+
+#Of these three solutions we can strongly say that hierarchical has given the best set of clusters. 
+# Now let us understand the whiskeys within each cluster of the hierarchical dendogram
+
+Cluster_No =cutree(fit.average,5)
+whiskey_clus = cbind(data_dup1,Cluster_No)
+
+Cluster_1 = subset(whiskey_clus,Cluster_No==1)
+Cluster_2 = subset(whiskey_clus,Cluster_No==2)
+Cluster_3 = subset(whiskey_clus,Cluster_No==3)
+Cluster_4 = subset(whiskey_clus,Cluster_No==4)
+Cluster_5 = subset(whiskey_clus,Cluster_No==5)
+
+# How did I interpret clusters?
+#I aggregated each cluster at mean and then looked at attributes which have mean > 0.5 (considerable mean)
+
+#Analysis of Whiskeys in each cluster and target audience 
+# 
+# "Business Interpretation of Cluster 1 Whiskeys -- (25 Whiskeys) -- Light and Exhilariting whiskeys
+# These whiskeys are primarly categroized by Nose and Palate attributes.
+# These whiskeys have a combination - sweet, spice, light, fruit, grass
+# Hence, the primary target audience are people who drink light and people who want a unique taste (Palate). Targeted towards people  who drink light whiskeys
+# 
+# Business Interpretation of Cluster 2 Whiskeys -- (16 Whiskeys) -- Sweet and Dry whiskeys
+# These whiskeys are primarly categroized by Nose, Body and Palate attributes.
+# These whiskeys have a combination - sweet(Nose), sherry, medium, smooth, dry, sweet(Pal)
+# Hence, the primary target audience are people who like Sweet Palate whiskeys that are smooth and dry. Targeted towards people  who like sweet whiskeys
+# 
+# Business Interpretation of Cluster 3 Whiskeys -- (25 Whiskeys) -- 90 % of this cluster comprises of Medium Whiskeys
+# These whiskeys are primarly categroized by Nose, Body and Palate attributes.
+# These whiskeys have a combination - Peat, Sweet, Medium, Dry
+# Hence, the primary target audience are people who like only Medium whiskeys. Targeted towards Medium whiskey drinkers
+# 
+# Business Interpretation of Cluster 4 Whiskeys -- (19 Whiskeys) -- 80 % of cluster comprises of Light and fruit flavored Whiskeys
+# These whiskeys are primarly categroized by Body and Palate attributes.
+# These whiskeys have a combination - Smooth, Light, Fruit, grass, Sweet
+# Hence, the primary target audience are people who like Fruit Flavored light whiskeys. Targeted towards light/social drinkers
+# 
+# Business Interpretation of Cluster 5 Whiskeys -- (24 Whiskeys) -- Cocktail/Lively Whiskeys -- Has a part of every attribute  
+# These whiskeys are primarly categroized by Color, Nose, Body, plate, Finish attributes.
+# These whiskeys have a combination - Aroma, Peat, Medium, Sweet, Dry
+# Hence, primary target audience are people who try different whiskeys. Targeted audience is outgoing youth/exicitement seekers etc.
+
+
+
+```
