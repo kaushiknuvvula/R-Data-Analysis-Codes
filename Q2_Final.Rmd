@@ -1,0 +1,232 @@
+---
+title: "Final Exam - Clustering Airline Passengers"
+author: "Kaushik Nuvvula"
+date: "December 19, 2015"
+output: html_document
+self_contained: yes
+---
+
+```{r, echo=FALSE}
+setwd("C:/Users/Kaushik Nuvvula/Desktop/EDA/Final_Exam")
+
+airline <- read.csv("Final-Airlines.csv",header = TRUE)
+```
+
+```{r}
+#Thus, please provide the best (in your opinion) clustering of this dataset, 
+#explain what you did to obtain it, provide information to support your conclusions, 
+#and discuss your findings (e.g., what kind of customers each cluster represents) and any potential insights.
+
+#Installing the required packages
+
+#install.packages("corrplot")
+#install.packages("dbscan")
+#install.packages("plyr")
+#install.packages("dendextend")
+#install.packages("fpc")
+#install.packages("NbClust")
+#install.packages("dplyr")
+library(dplyr)
+library(xlsx)
+library(corrplot)
+library(dbscan)
+library(plyr)
+library(dendextend)
+library(fpc)
+library(NbClust)
+
+#examining the structure of data
+str(airline)
+
+#assigning the member ID to rownames
+rownames(airline)<- airline[,1]
+
+#Hence removing the ID column from data as it is already present as rowname
+airline1 = airline[,2:12]
+
+#airline1[,3] <- as.double(as.factor(airline1[,3]))
+#airline1[,4] <- as.double(as.factor(airline1[,4]))
+#airline1[,5] <- as.double(as.factor(airline1[,5]))
+#airline1[,11] <- as.double(as.factor(airline1[,11]))
+
+#onverting to a dataframe
+airline1 = as.data.frame(airline1)
+
+#Reordering Columns
+airline1 <- airline1[ , c("Balance", "Qual_miles", "Bonus_miles",             "Bonus_trans","Flight_miles_12mo","Flight_trans_12",
+                          "Days_since_enroll","cc1_miles","cc2_miles","cc3_miles","Award.")]
+
+#Use biplot to visualize multi-dimensional data in one plot
+labels <- 1:nrow(airline1)
+#Plotting
+biplot(prcomp(airline1), cex=.8, xlabs=labels)
+
+#From the biplot we clearly do see any obvious groups. ALso there are only few members who deviate from the centroid
+
+# Lets us check the biplot after normalizing data
+# Normaizing required variables
+normalize <- function(x){
+  return ((x - min(x))/(max(x) - min(x)))}
+
+data_normalized1 = mutate(airline1, 
+                         Balance = normalize(Balance),
+                         Qual_miles = normalize(Qual_miles),
+                         cc1_miles = normalize(cc1_miles),
+                         cc2_miles = normalize(cc2_miles),
+                         cc3_miles = normalize(cc3_miles),
+                         Bonus_miles = normalize(Bonus_miles),
+                         Bonus_trans = normalize(Bonus_trans),
+                         Flight_miles_12mo = normalize(Flight_miles_12mo),
+                         Flight_trans_12 = normalize(Flight_trans_12),
+                         Days_since_enroll = normalize(Days_since_enroll),
+                         Award. = normalize(Award.))
+summary(data_normalized1)
+
+#biplot for normmalized data: We see data in two segments, which makes this problem complicated
+labels <- 1:nrow(data_normalized1)
+#labels[-outliers.above.2] <- "."
+biplot(prcomp(data_normalized1), cex=.8, xlabs=labels)
+
+# At a top level, we can see two groups in data
+# Now, I want to see if removing any of the variables will still capture the variance in the data.
+#After removing different variables I found that removing balance and Awards variable gives me the ideal groups.
+#The biplot affirms this as well, as we clearly see 5 groups in the data.
+#Basically, I am selecting attributes (attribute selection) which gives me best groups/clusters of people.
+
+#Biplot after removing Award and balance columns
+data_normalized2 = data_normalized1[,2:10]
+
+#This biplot looks much better, as we see 5 groups in data.
+labels <- 1:nrow(data_normalized2)
+#labels[-outliers.above.2] <- "."
+biplot(prcomp(data_normalized2), cex=.8, xlabs=labels)
+
+#Creating a subset of numerical attributes to check correlation
+#We see that some variables are haevily correlated
+#As Flight_miles_12mo and Flight_trans_12 are heavily correlated i tried removing one of these varriables and clusterd data. However, it did not give me an ideal clustering solution.
+
+corr_plot <- airline1 %>% select(Qual_miles, Bonus_miles, Bonus_trans, Flight_miles_12mo, 
+                                 Flight_trans_12, Days_since_enroll)
+
+#To adjust title margins
+par(oma=c(0,0,2,0))
+#Correlation plot
+corrplot(cor(corr_plot), method = "number",title = 'Correlation within Airlines Data',outer=TRUE)
+
+#Before Clustering lets check the distribution of the variables
+#Let us check the box plots to see if any outlier treatment has to be done
+
+#old.par = par(mfrow=c(1, 1))
+#par(oma=c(0,0,2,0))
+
+#From the box plots we see that other than Days_since_enroll all the other variables distribution is skewed towards the lower quartile.
+#However, as this is arilines data, outliers in this context might mean that these people are spending humungous
+#amounts when compared to normal people. Hence, I would not recommend deleting outliers or imputing them.
+par(oma=c(0,0,8,0))
+boxplot(data_normalized2$Qual_miles,data_normalized2$Bonus_miles,data_normalized2$Bonus_trans,
+        data_normalized2$Flight_miles_12mo, data_normalized2$Flight_trans_12,data_normalized2$Days_since_enroll,
+        names=c("Qual_miles","Bonus_miles","Bonus_trans","Flight_miles_12mo",
+                "Flight_trans_12","Days_since_enroll"),col=c("blue","tomato"),
+        main="Airlines Data",outer = TRUE)
+
+
+#Why I choose DB Scan Clustering? 
+#From the biplots that we saw, the groups were more have more like a density based structure unlike a set of points # in k-means or Hierarchical clustering.
+
+#dbscan clustering
+par(oma=c(6,6,0,0))
+kNNdistplot(data_normalized2, k = 5)
+abline(h=.25, col="red")
+
+#plot the density based cluster plot
+db <- dbscan(data_normalized2, eps=0.25, MinPts = 9)
+clus_no = db$cluster
+str(db)
+plot(db,db$cluster)
+
+#Validating the number of clusters using sumof squares.
+#We see that there is a drop between 7 and 8. Hence we can say that our cluster solution is applicable  
+#Scree plot to deterine the number of clusters
+par(oma=c(6,6,0,0))
+wss <- (nrow(data_normalized2)-1)*sum(apply(data_normalized2,2,var))
+for (i in 2:15) {
+  wss[i] <- sum(kmeans(data_normalized2,centers=i)$withinss)
+}   
+plot(1:15, wss, type="b", xlab="Number of Clusters",ylab="Within groups sum of squares")
+
+#appending cluster number to data
+airlines_final = cbind(airline1,clus_no)
+
+#group by cluster number to get the number of records in each cluster
+ddply(airlines_final, .(clus_no), nrow)
+
+#getting the cluster centers for all clusters
+agg = aggregate(airlines_final, list(airlines_final$clus_no), mean)
+
+#Cluster level aggregates
+agg = agg[,2:13]
+agg
+
+write.xlsx(agg, "C:/Users/Kaushik Nuvvula/Desktop/clus_data.xlsx")
+
+#Interpreting the clusters
+
+#Some clusters have less than 30 people. Given the business context of segmenting customers, I merged these #clusters
+
+#(clusters with less than 30 people) with similar clusters (based on cluster centers).
+
+#Cluster 0 and Cluster 5 - The Business/Affluent travelers (Most profitable to the company) - Tier 1 
+#These are the customers who have extremely high number of miles. Also, these people earned the highest miles in 12 #months. Hence, it is important for the company to retain these customers, as they constitute only 9% in the data. #On an average these travelers made 11 trips in the past 12 months. 
+
+#Cluster 1 - The Economy travelers - Tier 4
+#These travelers constitute 56% of the data. The aggregated numbers for this cluster are very basic. These travlers #made 1.3 trips on an average in the past 12 months. However, the airlines company should focus on these customers #as well as they constitute the majority.
+
+#Cluster 2 - The First Class travelers - Tier 2
+#This cluster comprises of people who have reasonably high number of miles and transactions in the past 12 months.
+#Also, these customers earned lot of miles using their credit card in the last 12 months. Hence, I placed them next #to business class(Tier 1).
+
+#Cluster 3 and Cluster 4 - The Premium economy travelers - Tier 3
+#These customers have accumulated a decent number of miles in the last 12 months using ther credit card, although
+#their average frequency of travel is less than 1. Thereby, we can say that these customers shouls have travelled #in a premium class which enables them to earn more miles. 
+
+#Cluster 6 and Cluster 7 - The basic travelers - Tier 5
+#These travlers have the least number of miles and they have 0 miles counted towards their topflying status. And #these customers have the least award ratio, which is somewhat obvious. The company can reduce their promotional #campaigns for this class as they are very frequent and less in number.
+
+
+```
+
+
+```{r}
+
+#Appendix - Checking Hierarchial and k-means
+#Checking out hierarchical  clustering with 5 clusters
+#Although the clusters look good, the difference between clusters is very close.
+#Hence, we would not get interpretable clusters. SO I prefer dbscan's  clustering result
+distance <- dist(data_normalized2, method = "euclidean")
+#hcluster <- hclust(distance, method = "ward.D") #using wards method to calculate cluster
+#plot(hcluster, hang = 0, label = F, main = "Cluster Dendrogram") 
+
+fit.average <- hclust(distance, method="ward.D") 
+plot(fit.average, hang=1, cex=.8, main="Cluster Dendogram")
+dendogram = rect.hclust(fit.average, k=5)
+
+#install.packages("dendextend")
+# Using Hierarchical Clustering we can see that there are 5 clusters if we look at the dendogram
+
+dendogram = color_labels(fit.average, k = 5)
+plot(dendogram)
+
+#Checking k-means with 5 clusters
+
+#kmeans -  does not give a good clustering result. Check the image
+kcluster <- kmeans(data_normalized2, 5) # mentioning 3 as we saw 3 clusters in hierarchial clustering
+kcluster$size # Number of data points in ecah cluster
+kcluster$centers #gives the corodinates of centrioid
+kcluster$cluster # Shows the cluster to which each data point belongs
+plot(data_normalized2, col = (kcluster$cluster), main = "K means clustering",
+     pch = 20, cex =2 )
+
+
+plotcluster(x = data_normalized2,kcluster$cluster)
+
+```

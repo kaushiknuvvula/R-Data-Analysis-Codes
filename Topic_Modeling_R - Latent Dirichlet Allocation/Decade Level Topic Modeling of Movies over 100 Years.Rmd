@@ -1,0 +1,277 @@
+---
+title: "Decade Level Topic Modeling of Movies over 100 Years"
+author: "Kaushik Nuvvula"
+date: "December 19, 2015"
+output: html_document
+self_contained: yes
+---
+
+
+
+```{r, echo=FALSE}
+setwd("C:/Users/Kaushik Nuvvula/Desktop/EDA/Final_Exam")
+```
+
+Part 1 - Decade level movie genre analysis
+```{r}
+#Your goal is to analyze what is it about movies that makes them different from year to year and decade to decade. 
+#For this you have access to taglines that are associated with movies in the given dataset for this exam -- 
+#The tagline is used to advertise the movie and appears on posters and covers. Use all the 
+#tools you have learned in this course to create a data-driven narrative of 
+#how movies have changed over the time span that this data covers.
+
+#libraries used
+set.seed(1000)
+library(xlsx)
+library(dplyr)
+library(tm)
+library(ggplot2)
+library(lsa)
+library(scatterplot3d)
+library(SnowballC)
+library(NLP)
+library(RColorBrewer)
+library(wordcloud)
+library(topicmodels)
+library(reshape2)
+library(stats)
+library(RColorBrewer)
+#install.packages("RColorBrewer")
+
+#Part 1 - Decade level analysis
+#loading data
+data <- read.csv("movieTagline.csv",header = TRUE)
+
+#looking at the structure of data
+str(data)
+
+# assigning decade to each of the movie
+
+data$decade <- ifelse(data$year > 1914 & data$year <1925, "1915-1924",
+               ifelse(data$year > 1924 & data$year <1935, "1925-1934",
+               ifelse(data$year > 1934 & data$year <1945, "1935-1944",
+               ifelse(data$year > 1944 & data$year <1955, "1945-1954",
+               ifelse(data$year > 1954 & data$year <1965, "1955-1964",
+               ifelse(data$year > 1964 & data$year <1975, "1965-1974",
+               ifelse(data$year > 1974 & data$year <1985, "1975-1984",
+               ifelse(data$year > 1984 & data$year <1995, "1985-1994",
+               ifelse(data$year > 1994 & data$year <2005, "1995-2004",
+               ifelse(data$year > 2004 & data$year <2015, "2005-2014",
+               NA  ))))))))))
+#mov_tag = data$tagline
+
+file1 = subset(data$tagline, data$decade == "1915-1924")
+file2 = subset(data$tagline, data$decade == "1925-1934")
+file3 = subset(data$tagline, data$decade == "1935-1944")
+file4 = subset(data$tagline, data$decade == "1945-1954")
+file5 = subset(data$tagline, data$decade == "1955-1964")
+file6 = subset(data$tagline, data$decade == "1965-1974")
+file7 = subset(data$tagline, data$decade == "1975-1984")
+file8 = subset(data$tagline, data$decade == "1985-1994")
+file9 = subset(data$tagline, data$decade == "1995-2004")
+file10 = subset(data$tagline, data$decade == "2005-2014")
+
+write.table(file1, "C:/Users/Kaushik Nuvvula/Desktop/EDA/Final_Exam/decade_files/1.txt", sep="\t")
+write.table(file2, "C:/Users/Kaushik Nuvvula/Desktop/EDA/Final_Exam/decade_files/2.txt", sep="\t")
+write.table(file3, "C:/Users/Kaushik Nuvvula/Desktop/EDA/Final_Exam/decade_files/3.txt", sep="\t")
+write.table(file4, "C:/Users/Kaushik Nuvvula/Desktop/EDA/Final_Exam/decade_files/4.txt", sep="\t")
+write.table(file5, "C:/Users/Kaushik Nuvvula/Desktop/EDA/Final_Exam/decade_files/5.txt", sep="\t")
+write.table(file6, "C:/Users/Kaushik Nuvvula/Desktop/EDA/Final_Exam/decade_files/6.txt", sep="\t")
+write.table(file7, "C:/Users/Kaushik Nuvvula/Desktop/EDA/Final_Exam/decade_files/7.txt", sep="\t")
+write.table(file8, "C:/Users/Kaushik Nuvvula/Desktop/EDA/Final_Exam/decade_files/8.txt", sep="\t")
+write.table(file9, "C:/Users/Kaushik Nuvvula/Desktop/EDA/Final_Exam/decade_files/9.txt", sep="\t")
+write.table(file10, "C:/Users/Kaushik Nuvvula/Desktop/EDA/Final_Exam/decade_files/10.txt", sep="\t")
+
+#Specifying the directory name and creating a corpus
+dirname <- file.path("C:/Users/Kaushik Nuvvula/Desktop/EDA/Final_Exam/", "decade_files")
+docs <- Corpus(DirSource(dirname, encoding = "UTF-8"))
+meta(docs[[1]])
+
+# The following steps pre-process the raw text documents.
+
+# 1) Remove punctuations and numbers because they are generally uninformative.
+docs <- tm_map(docs, removePunctuation)
+docs <- tm_map(docs, removeNumbers)
+
+# 2) Convert all words to lowercase.
+docs <- tm_map(docs, content_transformer(tolower))
+
+# 3) Remove stopwords such as "a", "the", etc.
+docs <- tm_map(docs, removeWords, stopwords("english"))
+
+# 4) Use the SnowballC package to do stemming.
+#install.packages("SnowballC")
+docs <- tm_map(docs, stemDocument)
+
+# 5) Remove excess white spaces between words.
+docs <- tm_map(docs, stripWhitespace)
+
+
+# Inspect the first document to see what it looks like.
+# I am not printing this as it is a very long list
+#docs[[1]]$content
+
+# Lets visualize the entire corpus
+
+# Inspect the words in 1915-1924 document to see what it looks like.
+pal <- brewer.pal(8, "Dark2")
+wordcloud(docs[1], min.freq=3, max.words = 200, random.order = TRUE, col = pal )
+#from the word bubble we see words origin and poster more frequently
+
+
+# Inspect the words in 2005-2014 document to see what it looks like.
+pal <- brewer.pal(8, "Dark2")
+wordcloud(docs[10], min.freq=4, max.words = 200, random.order = TRUE, col = pal )
+#from the word bubble we see words like love, life, comedy,  adventure, time more frequently
+
+
+# Convert all documents to a term frequency matrix.
+tfm <- DocumentTermMatrix(docs)
+
+# We can check the dimension of this matrix by calling dim()
+print(dim(tfm))
+
+# Use topicmodels package to conduct LDA analysis.
+# As we do not know the ideal number of topics let us create a topic model with different k values
+# I used the loglikelihood to  choose ideal number of topics. 
+#As it takes lot of time to run these differnt LDA's, I commented the multiple LDA's that I tried
+
+
+#results0 <- LDA(tfm, k = 5, method = "Gibbs")
+#results1 <- LDA(tfm, k = 6, method = "Gibbs")
+#results2 <- LDA(tfm, k = 7, method = "Gibbs")
+#results3 <- LDA(tfm, k = 8, method = "Gibbs")
+#results4 <- LDA(tfm, k = 9, method = "Gibbs")
+#results5 <- LDA(tfm, k = 10, method = "Gibbs")
+#results6 <- LDA(tfm, k = 11, method = "Gibbs")
+#results7 <- LDA(tfm, k = 12, method = "Gibbs")
+
+#x1 = logLik(results0)[1]
+#x2 = logLik(results1)[1]
+#x3 = logLik(results2)[1]
+#x4 = logLik(results3)[1]
+#x5 = logLik(results4)[1]
+#x6 = logLik(results5)[1]
+#x7 = logLik(results6)[1]
+#x8 = logLik(results7)[1]
+
+#plot(x1:x8)
+set.seed(1000)
+results <- LDA(tfm, k = 7, method = "Gibbs")
+
+# Obtain the top ten words (i.e., the 10 most probable words) for each topic.
+Terms <- terms(results, 10)
+Terms
+
+# Obtain the most likely topic assignment for each document.
+Topic <- topics(results, 1)
+Topic
+
+# Get the posterior probability for each document over each topic
+posterior <- posterior(results)[[2]]
+posterior 
+
+#look at the posterior topic distribution for the first document and plot it visually
+posterior(results)[[2]][1,]
+barplot(posterior(results)[[2]][1,])
+
+#Appending the decade number to visualize  posterior plot for each document
+decade_number = c(1, 10, 2, 3, 4, 5, 6, 7, 8, 9)
+#decade number 1 corresponds to 1: 1915-1924. Similarly for 2, 3 ...9, until 10 which correponds to 2005-2014
+
+posterior1 = cbind(posterior, decade_number)
+
+#sort the posterior probabilities by decade number
+posterior_sort <- posterior1[order(decade_number),]
+posterior_sort
+
+#Lets plot the stacked bar plot for posterior probabilities across all decades
+#GGplot across decades
+decade_plot = as.data.frame.matrix(posterior_sort) 
+
+control1 <- melt(decade_plot, id.var="decade_number",variable.name = "topic",value.name = "proportion"  )
+#control1 = arrange(control1,decade_number, proportion)
+
+
+#Assigning topic names using match and index
+index <- c(1, 2, 3, 4,5, 6,7)
+values <- c("Drama", "Cult/Seasonal", "Romance/Fiction", "Horror/Terror", "Science Fiction","Theatrical","Thrillers/Action")
+control1$topicname <- values[match(control1$topic, index)]
+
+#Let us have a look at the melted dataframe
+control1
+
+#Here is the stacked bar plot 
+library(ggplot2)
+ggplot(control1, aes(x = decade_number, y = proportion, fill = topicname)) + 
+  geom_bar(stat = "identity")  + labs(title="Genres Across decades using Gibbs LDA  - Clear Topics (Advised)")
+
+
+#Alternately lets visualize using line graph can show the trend clearly
+ggplot(control1, aes(x = decade_number, y = proportion, colour = topicname)) + 
+  geom_line(stat = "identity", size = 2 )+ labs(title="Genres Across Decades using Gibbs LDA - Clear Topics (Advised)")
+
+
+#examine the main topic for document 1
+# In a similar way we can examine topics for multiple documents
+Terms[,7]
+
+
+# Appendix trying LDA with VEM
+# I tried using variational expectation maximization (VEM)
+#Howver as we see, from the plots the topics are not well split across this data set
+# Hence, I  prefer using gibbs method on this data set rather than VEM
+results_VEM <- LDA(tfm, k = 7, method = "VEM")
+
+# Obtain the top ten words (i.e., the 10 most probable words) for each topic.
+Terms <- terms(results_VEM, 10)
+Terms
+
+# Obtain the most likely topic assignment for each document.
+Topic <- topics(results_VEM, 1)
+Topic
+
+# Get the posterior probability for each document over each topic
+posterior <- posterior(results_VEM)[[2]]
+posterior 
+
+#look at the posterior topic distribution for the first document and plot it visually
+posterior(results_VEM)[[2]][1,]
+barplot(posterior(results_VEM)[[2]][1,])
+
+#Appending the decade number to visualize  posterior plot for each document
+decade_number = c(1, 10, 2, 3, 4, 5, 6, 7, 8, 9)
+#decade number 1 corresponds to 1: 1915-1924. Similarly for 2, 3 ...9, until 10 which correponds to 2005-2014
+
+posterior1 = cbind(posterior, decade_number)
+
+#sort the posterior probabilities by decade number
+posterior_sort <- posterior1[order(decade_number),]
+posterior_sort
+
+#Lets plot the stacked bar plot for posterior probabilities across all decades
+#GGplot across decades
+decade_plot = as.data.frame.matrix(posterior_sort) 
+
+control1 <- melt(decade_plot, id.var="decade_number",variable.name = "topic",value.name = "proportion"  )
+
+
+#Assigning topic names using match and index
+index <- c(1, 2, 3, 4,5, 6,7)
+values <- c("Thrill/Romance/Drama", "Love", "Time", "Adventure", "Drama","Life","World")
+control1$topicname <- values[match(control1$topic, index)] 
+
+
+#Let us have a look at the melted dataframe
+control1
+
+#Here is the stacked bar plot 
+#Howver as we see, from the plots the topics are not well split across this data set
+# Hence, I  prefer using gibbs method on this data set rather than VEM
+
+ggplot(control1, aes(x = decade_number, y = proportion, fill = topicname)) + 
+  geom_bar(stat = "identity")  + labs(title="Genres Across Decades using (VEM) LDA - No clear topics (not advised)")
+
+
+
+```
