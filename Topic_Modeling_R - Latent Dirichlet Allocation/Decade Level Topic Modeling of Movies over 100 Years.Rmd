@@ -2,7 +2,7 @@
 title: "Decade Level Topic Modeling of Movies over 100 Years"
 author: "Kaushik Nuvvula"
 date: "December 19, 2015"
-output: html_document
+output: pdf_document
 self_contained: yes
 ---
 
